@@ -1351,3 +1351,230 @@ system2(
   "open",
   shQuote(path("PubMed_prioritised_screening.xlsx"))
 )
+
+
+# N.b after manual inspections, there are some ineligible publications; so a second round of screening is needed:
+
+library(dplyr)
+library(stringr)
+library(tidyr)
+
+root <- path.expand("~/Documents/VOCs_project/data")
+
+papers <- read.xlsx(
+  file.path(root, "PubMed_prioritised_screening.xlsx"),
+  sheet = "Screening"
+) %>%
+  mutate(PMID = as.character(PMID)) %>%
+  distinct(PMID, .keep_all = TRUE)
+
+priority <- papers %>%
+  filter(Screening_tier %in% c(1, 2))
+
+# OR:
+           
+priority <- read.csv(
+  file.path(root, "PubMed_priority_dataset.csv"),
+  stringsAsFactors = FALSE
+)
+
+priority_screened <- priority %>%
+  mutate(
+    Title_text = str_to_lower(coalesce(Title, "")),
+    Abstract_text = str_to_lower(coalesce(Abstract, "")),
+    
+    # 1. Sleep and respiratory disorders
+    Flag_Sleep_respiratory = str_detect(
+      Title_text,
+      "sleep apn|sleep apno|sleep quality|sleep duration|insomnia|sleep deprivation|copd|obstructive pulmonary"
+    ),
+    
+    # 2. Animal and cell-based research
+    Flag_Animal_or_cell = str_detect(
+      Title_text,
+      "\\bmice\\b|\\bmouse\\b|\\brats?\\b|murine|rodent|zebrafish|animal model|5xfad|in vitro|cell lines?|cultured cells|drosophila"
+    ),
+    
+    # 3. Environmental and occupational exposure
+    Flag_Exposure = str_detect(
+      Title_text,
+      "exposure|air pollution|occupational|neurotoxicity|environmental pollutants|indoor air|ambient air|nhanes"
+    ),
+    
+    # 4. Olfactory function and chemosensory communication
+    Flag_Olfaction_chemosignals = str_detect(
+      Title_text,
+      "olfactory function|olfactory dysfunction|olfactory perception|olfactory threshold|chemosignal|chemosensory|odor perception|odour perception|odorant receptor|olfactory receptor"
+    ),
+    
+    # 5. Drug detection and toxicology
+    Flag_Drug_toxicology = str_detect(
+      Title_text,
+      "intoxication|poisoning|forensic|drug testing|drugs of abuse|pharmacokinetic|drug detection|therapeutic drug monitoring"
+    ),
+    
+    # 6. Non-neurological primary phenotypes
+    Flag_Other_phenotype = str_detect(
+      Title_text,
+      "sarcopenia|halitosis|gastroesophageal reflux|periodontitis|lactose intolerance|pneumonia|oral malodour|oral malodor|lung cancer|breast cancer|colorectal cancer"
+    ),
+    
+    # 7. Food, plant and industrial chemistry
+    Flag_Food_plant_industrial = str_detect(
+      Title_text,
+      "essential oils?|aromatherapy|brewed coffee|food quality|food flavour|food flavor|forest therapy|botanic garden|plant volatiles|industrial emissions"
+    ),
+    
+    # 8. Reviews and protocols
+    Flag_Nonprimary = str_detect(
+      str_to_lower(coalesce(Publication_types, "")),
+      "\\breview\\b|meta-analysis|editorial|commentary"
+    ) |
+      str_detect(
+        Title_text,
+        "systematic review|scoping review|narrative review|study protocol|review of the literature"
+      ),
+    
+    # 9. Incorrect VOC acronym
+    Flag_Acronym = str_detect(
+      Abstract_text,
+      "validity of cognition|voice of customer|vocabulary of"
+    ),
+    
+    # 10. Analytical development without clear clinical application
+    Flag_Analytical = str_detect(
+      Title_text,
+      "method development|analytical validation|sensor development|sampling optimisation|sampling optimization|identifying robust and reliable"
+    )
+  )
+
+
+flag_columns <- grep(
+  "^Flag_",
+  names(priority_screened),
+  value = TRUE
+)
+
+priority_screened <- priority_screened %>%
+  mutate(
+    Flag_count = rowSums(
+      across(all_of(flag_columns)),
+      na.rm = TRUE
+    )
+  ) %>%
+  rowwise() %>%
+  mutate(
+    Screening_flags = paste(
+      str_remove(
+        flag_columns[
+          which(c_across(all_of(flag_columns)))
+        ],
+        "^Flag_"
+      ),
+      collapse = "; "
+    )
+  ) %>%
+  ungroup() %>%
+  mutate(
+    Manual_eligibility = "",
+    Manual_exclusion_reason = "",
+    Screening_notes = ""
+  ) %>%
+  select(-Title_text, -Abstract_text)
+
+write.csv(
+  priority_screened,
+  file.path(root, "PubMed_priority_exclusion_screen.csv"),
+  row.names = FALSE,
+  na = ""
+)
+
+
+priority_screened %>%
+  summarise(
+    across(
+      all_of(flag_columns),
+      ~ sum(.x, na.rm = TRUE)
+    )
+  ) %>%
+  pivot_longer(
+    everything(),
+    names_to = "Exclusion_category",
+    values_to = "N"
+  ) %>%
+  arrange(desc(N))
+
+priority_refined <- priority_screened %>%
+  filter(Flag_count == 0)
+
+cat("Original publications:", nrow(priority), "\n")
+cat("Flagged publications:", nrow(flagged_papers), "\n")
+cat("Remaining publications:", nrow(priority_refined), "\n")
+
+View(priority_refined)
+
+View(
+  priority_screened %>%
+    filter(Flag_Sleep_respiratory) %>%
+    select(PMID, Title, Abstract)
+)
+
+priority_refined <- priority_screened %>%
+  filter(Flag_count == 0)
+
+write.csv(
+  priority_refined,
+  file.path(root, "PubMed_priority_refined.csv"),
+  row.names = FALSE,
+  na = "",
+  fileEncoding = "UTF-8"
+)
+           
+# additional screening
+           exclude_pmids <- c(
+  40777204, 31990659, 38892525, 41998538,
+  19362154, 38997651, 35619259, 40059298,
+  39038625, 38531449, 38408965, 37661612,
+  39730697, 31108353, 39835431, 38413886,
+  30871731, 42035679, 40812234, 36833470,
+  37447245, 36893999, 30231844, 23414594,
+  36521651, 33422593, 9580447, 7942515,
+  41855864, 31349234, 24452069, 21439147,
+  20638346, 26222873, 1799580, 7096519,
+  35012788, 38085692, 41494207, 28778200,
+  39615812, 28408159, 32650940, 32197792,
+  35577098, 8254857, 1619927, 8675549
+)
+
+priority_refined <- priority_refined %>%
+  mutate(PMID = as.character(PMID))
+
+# Preserve excluded publications for the screening audit
+additional_exclusions <- priority_refined %>%
+  filter(PMID %in% as.character(exclude_pmids))
+
+# Retain remaining candidate publications
+priority_cleaned <- priority_refined %>%
+  filter(!PMID %in% as.character(exclude_pmids))
+
+cat("Before screening:", nrow(priority_refined), "\n")
+cat("Additional exclusions:", nrow(additional_exclusions), "\n")
+cat("Remaining publications:", nrow(priority_cleaned), "\n")
+
+write.csv(
+  priority_cleaned,
+  file.path(root, "PubMed_priority_cleaned.csv"),
+  row.names = FALSE,
+  na = ""
+)
+
+write.csv(
+  additional_exclusions,
+  file.path(root, "PubMed_additional_exclusions.csv"),
+  row.names = FALSE,
+  na = ""
+)
+
+
+
+           
