@@ -20,7 +20,7 @@ dir.create(
 )
 
 cleaned <- read.csv(
-  file.path(root, "PubMed_priority_cleaned.csv"),
+  file.path(root, "PubMed_priority_cleaned_final.csv"),
   stringsAsFactors = FALSE,
   colClasses = c(PMID = "character")
 ) %>%
