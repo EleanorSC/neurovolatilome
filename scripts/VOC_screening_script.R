@@ -1679,6 +1679,12 @@ nrow(priority_cleaned)
 nrow(manual_excluded)
 nrow(priority_cleaned_final)
 
+write.csv(
+  priority_cleaned_final,
+  file.path(root, "PubMed_priority_cleaned_final.csv"),
+  row.names = FALSE
+)
+
 
 
            
