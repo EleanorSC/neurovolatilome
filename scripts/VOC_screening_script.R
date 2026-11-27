@@ -1575,6 +1575,114 @@ write.csv(
   na = ""
 )
 
+           
+#More manual screening: studies that fail Gate 2
+
+library(dplyr)
+library(tibble)
+library(tidyr)
+
+# Further manual screening: grouped exclusion reasons
+
+manual_exclusions <- list(
+
+  "Environmental or occupational VOC exposure" = c(
+    33231851, 23803111, 43011044, 25283072,
+    23024572, 11057602, 7601073, 8345533,
+    40127300, 18485684, 8206027, 32033278,
+    25639183, 40305737, 28709981, 26943595,
+    26892792, 25199969, 20823639, 10912362,
+    10418167, 9311533, 32470670, 39820093,
+    40670509
+  ),
+
+  "Chemical toxicity and substance exposure" = c(
+    41381046, 28173825, 38277722,
+    20010286, 26881973, 11204316, 7173912
+  ),
+
+  "Pharmaceutical detection and therapeutic drug monitoring" = c(
+    40081310, 37678210, 28888854, 20694517,
+    11595694, 3016011, 27206645, 1443816,
+    37449384
+  ),
+
+  "Botanical, cellular or experimental studies" = c(
+    35026505, 27537375, 42263918, 38398590,
+    37367833, 27466346, 7727503
+  ),
+
+  "Olfactory perception and chemosignalling" = c(
+    39137693, 36170254, 33360399,
+    34111768, 28835640, 36412058
+  ),
+
+  "Ineligible clinical phenotype" = c(
+    36864845, 36312001, 29720305, 7380907,
+    1247169, 15102667, 31022456, 27405054,
+    21727771, 27833693
+  ),
+
+  "Normal physiological variation" = c(
+    26582820, 25214354, 25545545, 29553604,
+    12214757, 24497852, 33143327
+  )
+)
+
+# Convert exclusion list into a lookup table
+
+exclusion_lookup <- enframe(
+  manual_exclusions,
+  name = "Exclusion_reason",
+  value = "PMID"
+) %>%
+  unnest_longer(PMID) %>%
+  mutate(PMID = as.character(PMID))
+
+# Check that each PMID has only one exclusion reason
+
+stopifnot(!anyDuplicated(exclusion_lookup$PMID))
+
+# Assign eligibility decisions to publications
+
+priority_screened_final <- priority_cleaned %>%
+  mutate(PMID = as.character(PMID)) %>%
+  left_join(exclusion_lookup, by = "PMID") %>%
+  mutate(
+    Manual_verdict = if_else(
+      is.na(Exclusion_reason),
+      "Retained",
+      "Exclude"
+    )
+  )
+
+# Retain excluded publications and their reasons
+
+manual_excluded <- priority_screened_final %>%
+  filter(Manual_verdict == "Exclude")
+
+# Create final screened dataset
+
+priority_cleaned_final <- priority_screened_final %>%
+  filter(Manual_verdict == "Retained")
+
+# Generate exclusion counts for Sankey diagram
+
+exclusion_summary <- manual_excluded %>%
+  count(Exclusion_reason, name = "N", sort = TRUE)
+
+View(exclusion_summary)
+
+# Check screening totals
+
+nrow(priority_cleaned)
+nrow(manual_excluded)
+nrow(priority_cleaned_final)
+
+
+
+           
+
 
 
            
