@@ -1593,7 +1593,7 @@ manual_exclusions <- list(
     25639183, 40305737, 28709981, 26943595,
     26892792, 25199969, 20823639, 10912362,
     10418167, 9311533, 32470670, 39820093,
-    40670509
+    40670509,38523395
   ),
 
   "Chemical toxicity and substance exposure" = c(
@@ -1617,16 +1617,23 @@ manual_exclusions <- list(
     34111768, 28835640, 36412058
   ),
 
-  "Ineligible clinical phenotype" = c(
+  "Other clinical phenotype, no brain phenotype" = c(
     36864845, 36312001, 29720305, 7380907,
     1247169, 15102667, 31022456, 27405054,
-    21727771, 27833693
+    21727771, 27833693,30373291
   ),
+
+  "Hypoglycaemia or ketosis detection without brain health phenotype" = c(
+  40414890,28569238),
 
   "Normal physiological variation" = c(
     26582820, 25214354, 25545545, 29553604,
-    12214757, 24497852, 33143327
-  )
+    12214757, 24497852, 33143327),
+
+    "No relevant VOC profiling" = c(
+      37654668,10199339,24548198,2809457,
+    33052545,21383452)
+  
 )
 
 # Convert exclusion list into a lookup table
